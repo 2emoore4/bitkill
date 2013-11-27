@@ -21,9 +21,7 @@ def average_file(input_file, output_file, chunk_size = -1):
 
     for x_chunk in xrange(0, input_image.size[0] - chunk_size, chunk_size):
         for y_chunk in xrange(0, input_image.size[1] - chunk_size, chunk_size):
-            avg_color = chunk_average(input_image, x_chunk, y_chunk, chunk_size)
-            all_colors.append(avg_color)
-            fill_chunk(tmp_image, x_chunk, y_chunk, chunk_size, avg_color)
+            break_down_block(input_image, tmp_image, x_chunk, y_chunk, chunk_size, all_colors)
 
     palette = make_palette(all_colors)
 
@@ -33,30 +31,32 @@ def average_file(input_file, output_file, chunk_size = -1):
 
     palette_image.save("palette.png", "PNG")
 
-    for x_chunk in xrange(0, input_image.size[0] - chunk_size, chunk_size):
-        for y_chunk in xrange(0, input_image.size[1] - chunk_size, chunk_size):
-            original_color = tmp_image.getpixel((x_chunk, y_chunk))
-#            blurred_original_color = average_from_surrounding(tmp_image, x_chunk, y_chunk, chunk_size)
+    for x in xrange(0, input_image.size[0] - chunk_size, chunk_size / 2):
+        for y in xrange(0, input_image.size[1] - chunk_size, chunk_size / 2):
+            original_color = tmp_image.getpixel((x, y))
             color_from_palette = closest_color(original_color, palette)
-            fill_chunk(output_image, x_chunk, y_chunk, chunk_size, color_from_palette)
+            fill_chunk(output_image, x, y, chunk_size / 2, color_from_palette)
 
     tmp_image.save("tmp.png", "PNG")
     output_image.save(output_file, "PNG")
 
-def average_from_surrounding(scan, x, y, chunk_size):
-    surrounding_points = [scan.getpixel((x, y - chunk_size)), scan.getpixel((x + chunk_size, y)), \
-            scan.getpixel((x, y + chunk_size)), scan.getpixel((x - chunk_size, y)), \
-            scan.getpixel((x - chunk_size, y - chunk_size)), scan.getpixel((x + chunk_size, y - chunk_size)), \
-            scan.getpixel((x + chunk_size, y + chunk_size)), scan.getpixel((x - chunk_size, y + chunk_size)), \
-            scan.getpixel((x, y)), scan.getpixel((x, y)), scan.getpixel((x, y))]
-
-    r_total, g_total, b_total = 0, 0, 0
-    for r, g, b in surrounding_points:
-        r_total += r
-        g_total += g
-        b_total += b
-
-    return (1, 1, 1)
+def break_down_block(in_image, out_image, x, y, chunk_size, all_colors, minimum_chunk_size = -1):
+    if minimum_chunk_size == -1:
+        minimum_chunk_size = ((in_image.size[0] + in_image.size[1]) / 2) / 70
+    variance = chunk_diff(in_image, x, y, chunk_size)
+    if variance < 2000 or chunk_size <= minimum_chunk_size:
+        avg_color = chunk_average(in_image, x, y, chunk_size)
+        all_colors.append(avg_color)
+        fill_chunk(out_image, x, y, chunk_size, avg_color)
+    else:
+        small_chunk_size = chunk_size / 2
+        adjusted_chunk_size = small_chunk_size
+        if chunk_size % 2 != 0:
+            adjusted_chunk_size += 1
+        break_down_block(in_image, out_image, x, y, small_chunk_size, all_colors, minimum_chunk_size)
+        break_down_block(in_image, out_image, x + small_chunk_size, y, adjusted_chunk_size, all_colors, minimum_chunk_size)
+        break_down_block(in_image, out_image, x, y + small_chunk_size, adjusted_chunk_size, all_colors, minimum_chunk_size)
+        break_down_block(in_image, out_image, x + small_chunk_size, y + small_chunk_size, adjusted_chunk_size, all_colors, minimum_chunk_size)
 
 def make_palette(all_colors):
     palette = []
@@ -100,6 +100,15 @@ def chunk_average(image, start_x, start_y, chunk_size):
     b = b_sum / pix_count
 
     return (r, g, b)
+
+def chunk_diff(image, start_x, start_y, chunk_size):
+    diff = 0
+    for x in xrange(start_x, start_x + chunk_size - 1):
+        for y in xrange(start_y, start_y + chunk_size - 1):
+            this_r, this_g, this_b = image.getpixel((x, y))
+            next_r, next_g, next_b = image.getpixel((x + 1, y + 1))
+            diff += math.fabs(next_r - this_r) * math.fabs(next_g - this_g) * math.fabs(next_b - this_b)
+    return diff / (chunk_size * chunk_size)
 
 def main():
     parser = OptionParser()
