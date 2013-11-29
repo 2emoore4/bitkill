@@ -86,8 +86,8 @@ def kill_gif(input_file, output_file, chunk_size = -1):
         output_frames.append(tmp)
         i += 1
 
-    writeGif("tmp.gif", tmp_frames, duration=Image.open(input_file).info['duration'], dither=0)
-    writeGif(output_file, output_frames, duration=Image.open(input_file).info['duration'], dither=0)
+    writeGif("tmp.gif", tmp_frames, duration=0.1, repeat=True, dither=0)
+    writeGif(output_file, output_frames, duration=0.1, repeat=True, dither=0)
 
 def analyseImage(path):
     im = Image.open(path)
