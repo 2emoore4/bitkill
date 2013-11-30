@@ -15,7 +15,7 @@ def kill_image(input_file, output_file, chunk_size = -1):
     if chunk_size == -1:
         chunk_size = ((input_image.size[0] + input_image.size[1]) / 2) / 35
 
-    print "input image size is " + str(input_frames.size[0]) + "x" + str(input_frames.size[1]) \
+    print "input image size is " + str(input_image.size[0]) + "x" + str(input_image.size[1]) \
             + " and chunk size is " + str(chunk_size)
 
     all_colors = []
@@ -32,8 +32,8 @@ def kill_image(input_file, output_file, chunk_size = -1):
 
     palette_image.save("palette.png", "PNG")
 
-    for x in xrange(0, input_frames.size[0] - chunk_size, chunk_size / 2):
-        for y in xrange(0, input_frames.size[1] - chunk_size, chunk_size / 2):
+    for x in xrange(0, input_image.size[0] - chunk_size, chunk_size / 2):
+        for y in xrange(0, input_image.size[1] - chunk_size, chunk_size / 2):
             original_color = tmp_image.getpixel((x, y))
             color_from_palette = closest_color(original_color, palette)
             fill_chunk(output_image, x, y, chunk_size / 2, color_from_palette)
