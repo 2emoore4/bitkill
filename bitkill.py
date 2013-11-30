@@ -22,7 +22,7 @@ def kill_image(input_file, output_file, chunk_size = -1):
 
     for x_chunk in xrange(0, input_image.size[0] - chunk_size, chunk_size):
         for y_chunk in xrange(0, input_image.size[1] - chunk_size, chunk_size):
-            break_down_block(input_image, tmp_image, x_chunk, y_chunk, chunk_size, all_colors)
+            break_down_block(input_image, tmp_image, x_chunk, y_chunk, chunk_size, all_colors, alpha = False)
 
     palette = make_palette(all_colors)
 
@@ -35,7 +35,7 @@ def kill_image(input_file, output_file, chunk_size = -1):
     for x in xrange(0, input_image.size[0] - chunk_size, chunk_size / 2):
         for y in xrange(0, input_image.size[1] - chunk_size, chunk_size / 2):
             original_color = tmp_image.getpixel((x, y))
-            color_from_palette = closest_color(original_color, palette)
+            color_from_palette = closest_color(original_color, palette, False)
             fill_chunk(output_image, x, y, chunk_size / 2, color_from_palette)
 
     tmp_image.save("tmp.png", "PNG")
@@ -62,7 +62,7 @@ def kill_gif(input_file, output_file, chunk_size = -1):
     	tmp = Image.new("RGBA", size, "black")
     	for x_chunk in xrange(0, size[0] - chunk_size, chunk_size):
         	for y_chunk in xrange(0, size[1] - chunk_size, chunk_size):
-            		break_down_block(frame, tmp, x_chunk, y_chunk, chunk_size, all_colors)
+            		break_down_block(frame, tmp, x_chunk, y_chunk, chunk_size, all_colors, alpha = True)
         tmp_frames.append(tmp)
         i += 1
 
@@ -81,7 +81,7 @@ def kill_gif(input_file, output_file, chunk_size = -1):
         for x in xrange(0, size[0] - chunk_size, chunk_size / 2):
             for y in xrange(0, size[1] - chunk_size, chunk_size / 2):
                 original_color = frame.getpixel((x, y))
-                color_from_palette = closest_color(original_color, palette)
+                color_from_palette = closest_color(original_color, palette, True)
                 fill_chunk(tmp, x, y, chunk_size / 2, color_from_palette)
         output_frames.append(tmp)
         i += 1
@@ -137,12 +137,12 @@ def processImage(path):
     except EOFError:
         pass
 
-def break_down_block(in_image, out_image, x, y, chunk_size, all_colors, minimum_chunk_size = -1):
+def break_down_block(in_image, out_image, x, y, chunk_size, all_colors, minimum_chunk_size = -1, alpha = False):
     if minimum_chunk_size == -1:
         minimum_chunk_size = ((in_image.size[0] + in_image.size[1]) / 2) / 70
-    variance = chunk_diff(in_image, x, y, chunk_size)
+    variance = chunk_diff(in_image, x, y, chunk_size, alpha)
     if variance < 2000 or chunk_size <= minimum_chunk_size:
-        avg_color = chunk_average(in_image, x, y, chunk_size)
+        avg_color = chunk_average(in_image, x, y, chunk_size, alpha)
         all_colors.append(avg_color)
         fill_chunk(out_image, x, y, chunk_size, avg_color)
     else:
@@ -150,10 +150,10 @@ def break_down_block(in_image, out_image, x, y, chunk_size, all_colors, minimum_
         adjusted_chunk_size = small_chunk_size
         if chunk_size % 2 != 0:
             adjusted_chunk_size += 1
-        break_down_block(in_image, out_image, x, y, small_chunk_size, all_colors, minimum_chunk_size)
-        break_down_block(in_image, out_image, x + small_chunk_size, y, adjusted_chunk_size, all_colors, minimum_chunk_size)
-        break_down_block(in_image, out_image, x, y + small_chunk_size, adjusted_chunk_size, all_colors, minimum_chunk_size)
-        break_down_block(in_image, out_image, x + small_chunk_size, y + small_chunk_size, adjusted_chunk_size, all_colors, minimum_chunk_size)
+        break_down_block(in_image, out_image, x, y, small_chunk_size, all_colors, minimum_chunk_size, alpha)
+        break_down_block(in_image, out_image, x + small_chunk_size, y, adjusted_chunk_size, all_colors, minimum_chunk_size, alpha)
+        break_down_block(in_image, out_image, x, y + small_chunk_size, adjusted_chunk_size, all_colors, minimum_chunk_size, alpha)
+        break_down_block(in_image, out_image, x + small_chunk_size, y + small_chunk_size, adjusted_chunk_size, all_colors, minimum_chunk_size, alpha)
 
 def make_palette(all_colors):
     palette = []
@@ -161,10 +161,13 @@ def make_palette(all_colors):
         palette.append(all_colors[random.randint(0, len(all_colors))])
     return palette
 
-def closest_color(color, palette):
+def closest_color(color, palette, alpha = False):
     diffs = []
     for other_color in palette:
-        r, g, b, a = color
+        if alpha:
+            r, g, b, a = color
+        else:
+            r, g, b = color
         o_r, o_g, o_b = other_color
         diffs.append(math.fabs(o_r - r) * math.fabs(o_g - g) * math.fabs(o_b - b))
 
@@ -180,12 +183,15 @@ def fill_chunk(image, start_x, start_y, chunk_size, color):
         for y in xrange(start_y, start_y + chunk_size):
             image.putpixel((x, y), color)
 
-def chunk_average(image, start_x, start_y, chunk_size):
+def chunk_average(image, start_x, start_y, chunk_size, alpha = False):
     r_sum, g_sum, b_sum = 0, 0, 0
 
     for x in xrange(start_x, start_x + chunk_size):
         for y in xrange(start_y, start_y + chunk_size):
-            r_pix, g_pix, b_pix, a_pix = image.getpixel((x, y))
+            if alpha:
+                r_pix, g_pix, b_pix, a_pix = image.getpixel((x, y))
+            else:
+                r_pix, g_pix, b_pix = image.getpixel((x, y))
             r_sum += r_pix
             g_sum += g_pix
             b_sum += b_pix
@@ -198,12 +204,16 @@ def chunk_average(image, start_x, start_y, chunk_size):
 
     return (r, g, b)
 
-def chunk_diff(image, start_x, start_y, chunk_size):
+def chunk_diff(image, start_x, start_y, chunk_size, alpha = False):
     diff = 0
     for x in xrange(start_x, start_x + chunk_size - 1):
         for y in xrange(start_y, start_y + chunk_size - 1):
-            this_r, this_g, this_b, this_a = image.getpixel((x, y))
-            next_r, next_g, next_b, next_a = image.getpixel((x + 1, y + 1))
+            if alpha:
+                this_r, this_g, this_b, this_a = image.getpixel((x, y))
+                next_r, next_g, next_b, next_a = image.getpixel((x + 1, y + 1))
+            else:
+                this_r, this_g, this_b = image.getpixel((x, y))
+                next_r, next_g, next_b = image.getpixel((x + 1, y + 1))
             diff += math.fabs(next_r - this_r) * math.fabs(next_g - this_g) * math.fabs(next_b - this_b)
     return diff / (chunk_size * chunk_size)
 
